@@ -29,3 +29,6 @@ build/
 
 # Logs
 *.log
+
+# Docs (local specs)
+docs/
