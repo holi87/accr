@@ -23,6 +23,7 @@ function formatPLN(value: number): string {
 export default function PricingSection() {
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -62,7 +63,7 @@ export default function PricingSection() {
           <tr key={item.id} className="hover:bg-gray-50">
             <td className="py-3 px-4 font-medium">{item.service}</td>
             <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
-              {formatPLN(item.priceNet)}
+              {item.priceNet === 0 ? 'bezpłatnie' : formatPLN(item.priceNet)}
             </td>
             <td className="py-3 px-4 text-gray-600">{item.perUnit}</td>
             <td className="py-3 px-4 text-gray-600">{item.validity}</td>
@@ -73,29 +74,46 @@ export default function PricingSection() {
   );
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-      <h2 className="text-xl font-semibold mb-6">Cennik</h2>
+    <div className="bg-white rounded-xl shadow-lg mb-8 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
+      >
+        <h2 className="text-xl font-semibold">Cennik usług akredytacyjnych</h2>
+        <svg
+          className={`w-6 h-6 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-      {materialyItems.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-base font-medium text-gray-800 mb-2">Akredytacja materiałów</h3>
-          <div className="overflow-x-auto">{renderTable(materialyItems)}</div>
+      {open && (
+        <div className="px-6 pb-6 border-t border-gray-100 pt-4">
+          {materialyItems.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-base font-medium text-gray-800 mb-2">Akredytacja materiałów szkoleniowych</h3>
+              <div className="overflow-x-auto">{renderTable(materialyItems)}</div>
+            </div>
+          )}
+
+          {dostawcaItems.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-base font-medium text-gray-800 mb-2">Akredytacja dostawcy szkoleń</h3>
+              <div className="overflow-x-auto">{renderTable(dostawcaItems)}</div>
+            </div>
+          )}
+
+          {pricing.note && (
+            <p className="text-xs text-gray-500 mt-4">{pricing.note}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            Wszystkie ceny netto. Do cen należy doliczyć VAT {pricing.vatRate}%.
+          </p>
         </div>
       )}
-
-      {dostawcaItems.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-base font-medium text-gray-800 mb-2">Akredytacja dostawcy</h3>
-          <div className="overflow-x-auto">{renderTable(dostawcaItems)}</div>
-        </div>
-      )}
-
-      {pricing.note && (
-        <p className="text-xs text-gray-500 mt-4">{pricing.note}</p>
-      )}
-      <p className="text-xs text-gray-500 mt-1">
-        Wszystkie ceny netto. Do cen należy doliczyć VAT {pricing.vatRate}%.
-      </p>
     </div>
   );
 }

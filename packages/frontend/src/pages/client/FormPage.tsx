@@ -264,10 +264,13 @@ export default function FormPage() {
                   const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'language');
                   return q ? values.answers[q.id] || '' : '';
                 })()}
-                accreditationType={(() => {
-                  const matQ = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'materialAccreditationType');
-                  const provQ = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'providerAccreditationType');
-                  return (matQ ? values.answers[matQ.id] : '') || (provQ ? values.answers[provQ.id] : '') || '';
+                materialAccreditationType={(() => {
+                  const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'materialAccreditationType');
+                  return q ? values.answers[q.id] || '' : '';
+                })()}
+                providerAccreditationType={(() => {
+                  const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'providerAccreditationType');
+                  return q ? values.answers[q.id] || '' : '';
                 })()}
                 productCount={(() => {
                   const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'istqbProducts');

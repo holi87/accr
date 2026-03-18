@@ -172,7 +172,7 @@ async function main() {
     label: 'Rodzaj akredytacji materiałów',
     type: 'RADIO',
     order: 2,
-    options: ['Akredytacja materiałów', 'Crossakredytacja materiałów'],
+    options: ['Akredytacja materiałów', 'Crossakredytacja materiałów', 'Przeniesienie materiału szkoleniowego'],
     showWhen: { applicationType: ['materialy'] },
   });
 
@@ -180,7 +180,7 @@ async function main() {
     label: 'Rodzaj akredytacji dostawcy',
     type: 'RADIO',
     order: 3,
-    options: ['Akredytacja (pierwsza)', 'Rozszerzenie zakresu akredytacji'],
+    options: ['Akredytacja (pierwsza)', 'Rozszerzenie zakresu akredytacji', 'Przeniesienie dostawcy szkoleń'],
     showWhen: { applicationType: ['dostawca'] },
   });
 

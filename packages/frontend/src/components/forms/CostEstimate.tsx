@@ -20,12 +20,13 @@ interface Props {
   applicationType: string[];
   entityType: string;
   language: string;
-  accreditationType: string;
+  materialAccreditationType: string;
+  providerAccreditationType: string;
   productCount: number;
 }
 
 function formatPLN(value: number): string {
-  return value.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' z\u0142';
+  return value.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
 }
 
 export interface CostLineItem {
@@ -39,7 +40,8 @@ export function calculateCost(
   pricing: PricingData,
   applicationType: string[],
   language: string,
-  accreditationType: string,
+  materialAccreditationType: string,
+  providerAccreditationType: string,
   productCount: number
 ): { lines: CostLineItem[]; totalNet: number; vatAmount: number; totalGross: number; vatRate: number } {
   const lines: CostLineItem[] = [];
@@ -53,8 +55,29 @@ export function calculateCost(
   );
 
   if (hasMaterialy) {
-    const isCross = accreditationType.toLowerCase().includes('cross');
-    if (!isCross) {
+    const matType = materialAccreditationType.toLowerCase();
+    const isCross = matType.includes('cross');
+    const isPrzeniesienie = matType.includes('przeniesienie');
+
+    if (isPrzeniesienie) {
+      const item = pricing.items.find((i) => i.id === 'przeniesienie_materialu');
+      if (item) {
+        lines.push({
+          label: item.service,
+          unitPrice: item.priceNet,
+          quantity: count,
+          subtotal: item.priceNet * count,
+        });
+      }
+    } else if (isCross) {
+      const item = pricing.items.find((i) => i.id === 'crossakredytacja');
+      lines.push({
+        label: item?.service || 'Crossakredytacja',
+        unitPrice: item?.priceNet || 0,
+        quantity: count,
+        subtotal: (item?.priceNet || 0) * count,
+      });
+    } else {
       const lang = language.toLowerCase();
       const isEn = lang.includes('ang') || lang === 'en' || lang === 'english';
       const itemId = isEn ? 'akredytacja_en' : 'akredytacja_pl';
@@ -67,25 +90,33 @@ export function calculateCost(
           subtotal: item.priceNet * count,
         });
       }
-    } else {
-      lines.push({
-        label: 'Crossakredytacja materia\u0142u',
-        unitPrice: 0,
-        quantity: count,
-        subtotal: 0,
-      });
     }
   }
 
   if (hasDostawca) {
-    const utrzymanie = pricing.items.find((i) => i.id === 'utrzymanie_dostawcy');
-    if (utrzymanie) {
-      lines.push({
-        label: utrzymanie.service,
-        unitPrice: utrzymanie.priceNet,
-        quantity: 1,
-        subtotal: utrzymanie.priceNet,
-      });
+    const provType = providerAccreditationType.toLowerCase();
+    const isPrzeniesenieDostawcy = provType.includes('przeniesienie');
+
+    if (isPrzeniesenieDostawcy) {
+      const item = pricing.items.find((i) => i.id === 'przeniesienie_dostawcy');
+      if (item) {
+        lines.push({
+          label: item.service,
+          unitPrice: item.priceNet,
+          quantity: 1,
+          subtotal: item.priceNet,
+        });
+      }
+    } else {
+      const utrzymanie = pricing.items.find((i) => i.id === 'utrzymanie_dostawcy');
+      if (utrzymanie) {
+        lines.push({
+          label: utrzymanie.service,
+          unitPrice: utrzymanie.priceNet,
+          quantity: 1,
+          subtotal: utrzymanie.priceNet,
+        });
+      }
     }
 
     const materialDostawca = pricing.items.find((i) => i.id === 'material_dostawca');
@@ -107,7 +138,13 @@ export function calculateCost(
   return { lines, totalNet, vatAmount, totalGross, vatRate };
 }
 
-export default function CostEstimate({ applicationType, language, accreditationType, productCount }: Props) {
+export default function CostEstimate({
+  applicationType,
+  language,
+  materialAccreditationType,
+  providerAccreditationType,
+  productCount,
+}: Props) {
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -116,7 +153,7 @@ export default function CostEstimate({ applicationType, language, accreditationT
     api
       .get<PricingData>('/form/pricing')
       .then(setPricing)
-      .catch(() => setError('Nie uda\u0142o si\u0119 pobra\u0107 cennika'))
+      .catch(() => setError('Nie udało się pobrać cennika'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -136,7 +173,8 @@ export default function CostEstimate({ applicationType, language, accreditationT
     pricing,
     applicationType,
     language,
-    accreditationType,
+    materialAccreditationType,
+    providerAccreditationType,
     productCount
   );
 
@@ -144,14 +182,14 @@ export default function CostEstimate({ applicationType, language, accreditationT
 
   return (
     <div className="border rounded-lg p-4 mt-6 bg-blue-50">
-      <h3 className="font-semibold text-lg mb-3">Szacunkowa kalkulacja koszt\u00f3w</h3>
+      <h3 className="font-semibold text-lg mb-3">Szacunkowa kalkulacja kosztów</h3>
 
       <table className="w-full text-sm mb-4">
         <thead>
           <tr className="border-b border-blue-200">
             <th className="text-left py-2 font-medium text-gray-700">Pozycja</th>
             <th className="text-right py-2 font-medium text-gray-700">Cena jedn. netto</th>
-            <th className="text-right py-2 font-medium text-gray-700">Ilo\u015b\u0107</th>
+            <th className="text-right py-2 font-medium text-gray-700">Ilość</th>
             <th className="text-right py-2 font-medium text-gray-700">Kwota netto</th>
           </tr>
         </thead>

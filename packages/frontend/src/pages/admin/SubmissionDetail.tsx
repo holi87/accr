@@ -401,7 +401,8 @@ export default function SubmissionDetail() {
         const language = langAnswer?.value || '';
         const matAccredAnswer = answers.find((a) => a.question.fieldKey === 'materialAccreditationType');
         const provAccredAnswer = answers.find((a) => a.question.fieldKey === 'providerAccreditationType');
-        const accreditationType = matAccredAnswer?.value || provAccredAnswer?.value || '';
+        const materialAccreditationType = matAccredAnswer?.value || '';
+        const providerAccreditationType = provAccredAnswer?.value || '';
         const istqbAnswer = answers.find((a) => a.question.fieldKey === 'istqbProducts');
         let productCount = 1;
         if (istqbAnswer?.value) {
@@ -415,7 +416,8 @@ export default function SubmissionDetail() {
           pricingData,
           submission.applicationType as string[],
           language,
-          accreditationType,
+          materialAccreditationType,
+          providerAccreditationType,
           productCount
         );
 
