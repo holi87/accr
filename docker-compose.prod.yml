@@ -4,9 +4,13 @@ services:
     restart: unless-stopped
     ports: ["3000:3000"]
     env_file: .env
-    volumes: [uploads:/app/uploads]
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/sjsi_accreditation
+      NODE_ENV: production
 
   postgres:
     image: postgres:16-alpine
@@ -15,12 +19,14 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: sjsi_accreditation
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Postgres NIE wystawiony na zewnątrz — dostępny tylko dla app
 
 volumes:
   pgdata:
