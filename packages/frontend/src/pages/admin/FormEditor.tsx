@@ -48,7 +48,7 @@ export default function FormEditor() {
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [addingTo, setAddingTo] = useState<number | null>(null);
-  const [tab, setTab] = useState<'sections' | 'consents'>('sections');
+  const [tab, setTab] = useState<'sections' | 'consents' | 'istqb'>('sections');
 
   // New question form
   const [newQ, setNewQ] = useState({
@@ -212,6 +212,12 @@ export default function FormEditor() {
         >
           Zgody i oświadczenia ({allConsents.length})
         </button>
+        <button
+          onClick={() => setTab('istqb')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'istqb' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          Produkty ISTQB®
+        </button>
       </div>
 
       {tab === 'sections' && (
@@ -321,6 +327,192 @@ export default function FormEditor() {
           ))}
         </div>
       )}
+
+      {tab === 'istqb' && (
+        <IstqbProductsEditor
+          sections={sections}
+          setSections={setSections}
+          setError={setError}
+          setSuccess={setSuccess}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- ISTQB Products Editor ---
+
+interface IstqbGroup {
+  group: string;
+  items: string[];
+}
+
+function IstqbProductsEditor({ sections, setSections, setError, setSuccess }: {
+  sections: Section[];
+  setSections: React.Dispatch<React.SetStateAction<Section[]>>;
+  setError: (s: string) => void;
+  setSuccess: (s: string) => void;
+}) {
+  // Find the istqbProducts question
+  const istqbQuestion = sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'istqbProducts');
+
+  const [groups, setGroups] = useState<IstqbGroup[]>([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newItemName, setNewItemName] = useState<Record<number, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (istqbQuestion?.options) {
+      const opts = istqbQuestion.options;
+      if (Array.isArray(opts) && opts.length > 0 && typeof opts[0] === 'object' && 'group' in opts[0]) {
+        setGroups(opts as IstqbGroup[]);
+      } else if (Array.isArray(opts)) {
+        // Flat array — wrap in single group
+        setGroups([{ group: 'Produkty', items: opts as string[] }]);
+      }
+    }
+  }, [istqbQuestion]);
+
+  const saveProducts = async () => {
+    if (!istqbQuestion) return;
+    setSaving(true);
+    try {
+      await api.put(`/admin/form/questions/${istqbQuestion.id}`, { options: groups });
+      // Update local state
+      setSections((prev) =>
+        prev.map((s) => ({
+          ...s,
+          questions: s.questions.map((q) =>
+            q.id === istqbQuestion.id ? { ...q, options: groups } : q,
+          ),
+        })),
+      );
+      setSuccess('Zapisano listę produktów ISTQB®');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Nie udało się zapisać produktów');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addGroup = () => {
+    if (!newGroupName.trim()) return;
+    setGroups([...groups, { group: newGroupName.trim(), items: [] }]);
+    setNewGroupName('');
+  };
+
+  const removeGroup = (idx: number) => {
+    if (!confirm(`Usunąć grupę "${groups[idx].group}" i wszystkie jej produkty?`)) return;
+    setGroups(groups.filter((_, i) => i !== idx));
+  };
+
+  const renameGroup = (idx: number, name: string) => {
+    setGroups(groups.map((g, i) => (i === idx ? { ...g, group: name } : g)));
+  };
+
+  const addItem = (groupIdx: number) => {
+    const name = (newItemName[groupIdx] || '').trim();
+    if (!name) return;
+    setGroups(groups.map((g, i) =>
+      i === groupIdx ? { ...g, items: [...g.items, name] } : g,
+    ));
+    setNewItemName({ ...newItemName, [groupIdx]: '' });
+  };
+
+  const removeItem = (groupIdx: number, itemIdx: number) => {
+    setGroups(groups.map((g, i) =>
+      i === groupIdx ? { ...g, items: g.items.filter((_, j) => j !== itemIdx) } : g,
+    ));
+  };
+
+  const renameItem = (groupIdx: number, itemIdx: number, name: string) => {
+    setGroups(groups.map((g, i) =>
+      i === groupIdx
+        ? { ...g, items: g.items.map((item, j) => (j === itemIdx ? name : item)) }
+        : g,
+    ));
+  };
+
+  if (!istqbQuestion) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6 text-center">
+        <p className="text-gray-500">Nie znaleziono pytania z kluczem "istqbProducts".</p>
+        <p className="text-sm text-gray-400 mt-1">Dodaj pytanie typu MULTI_SELECT z fieldKey "istqbProducts" w sekcji "O akredytacji".</p>
+      </div>
+    );
+  }
+
+  const totalProducts = groups.reduce((sum, g) => sum + g.items.length, 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{groups.length} grup, {totalProducts} produktów łącznie</p>
+        <button
+          onClick={saveProducts}
+          disabled={saving}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? 'Zapisywanie...' : 'Zapisz listę produktów'}
+        </button>
+      </div>
+
+      {groups.map((group, gi) => (
+        <div key={gi} className="bg-white rounded-lg shadow border p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              value={group.group}
+              onChange={(e) => renameGroup(gi, e.target.value)}
+              className="font-semibold text-sm px-2 py-1 border rounded flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-400">{group.items.length} produktów</span>
+            <button onClick={() => removeGroup(gi)} className="text-xs text-red-600 hover:underline">Usuń grupę</button>
+          </div>
+
+          <div className="space-y-1 ml-4">
+            {group.items.map((item, ii) => (
+              <div key={ii} className="flex items-center gap-2">
+                <span className="text-gray-300">•</span>
+                <input
+                  value={item}
+                  onChange={(e) => renameItem(gi, ii, e.target.value)}
+                  className="flex-1 text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button onClick={() => removeItem(gi, ii)} className="text-xs text-red-500 hover:underline">×</button>
+              </div>
+            ))}
+
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-gray-300">+</span>
+              <input
+                value={newItemName[gi] || ''}
+                onChange={(e) => setNewItemName({ ...newItemName, [gi]: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && addItem(gi)}
+                placeholder="Nowy produkt..."
+                className="flex-1 text-sm px-2 py-1 border border-dashed rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button onClick={() => addItem(gi)} className="text-xs text-green-600 hover:underline">Dodaj</button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Add group */}
+      <div className="bg-white rounded-lg shadow border border-dashed p-4">
+        <div className="flex items-center gap-2">
+          <input
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addGroup()}
+            placeholder="Nowa grupa (np. Expert Level)..."
+            className="flex-1 text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <button onClick={addGroup} disabled={!newGroupName.trim()} className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
+            + Dodaj grupę
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
