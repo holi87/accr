@@ -6,6 +6,7 @@ import StepDane from '@/components/forms/StepDane';
 import StepAkredytacja from '@/components/forms/StepAkredytacja';
 import StepZgody from '@/components/forms/StepZgody';
 import StepReview from '@/components/forms/StepReview';
+import CostEstimate from '@/components/forms/CostEstimate';
 
 export interface FormConfig {
   sections: Section[];
@@ -254,7 +255,32 @@ export default function FormPage() {
             />
           )}
           {step === 4 && (
-            <StepReview config={config} values={values} getVisibleQuestions={getVisibleQuestions} />
+            <>
+              <StepReview config={config} values={values} getVisibleQuestions={getVisibleQuestions} />
+              <CostEstimate
+                applicationType={values.applicationType}
+                entityType={values.entityType}
+                language={(() => {
+                  const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'language');
+                  return q ? values.answers[q.id] || '' : '';
+                })()}
+                accreditationType={(() => {
+                  const matQ = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'materialAccreditationType');
+                  const provQ = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'providerAccreditationType');
+                  return (matQ ? values.answers[matQ.id] : '') || (provQ ? values.answers[provQ.id] : '') || '';
+                })()}
+                productCount={(() => {
+                  const q = config.sections.flatMap((s) => s.questions).find((q) => q.fieldKey === 'istqbProducts');
+                  if (!q) return 1;
+                  try {
+                    const arr = JSON.parse(values.answers[q.id] || '[]');
+                    return Array.isArray(arr) ? arr.length : 1;
+                  } catch {
+                    return 1;
+                  }
+                })()}
+              />
+            </>
           )}
         </div>
 

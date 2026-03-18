@@ -325,6 +325,26 @@ async function main() {
     })
   );
 
+  // ── Pricing ───────────────────────────────────────────────────────
+  console.log('Seeding default pricing...');
+
+  await upsertSetting(
+    'pricing',
+    JSON.stringify({
+      items: [
+        { id: 'akredytacja_pl', service: 'Akredytacja materiału — j. polski', priceNet: 7000, perUnit: 'za materiał', validity: 'na czas obowiązywania sylabusa', applicableTo: 'materialy' },
+        { id: 'akredytacja_en', service: 'Akredytacja materiału — j. angielski', priceNet: 8000, perUnit: 'za materiał', validity: 'na czas obowiązywania sylabusa', applicableTo: 'materialy' },
+        { id: 'crossakredytacja', service: 'Crossakredytacja materiału', priceNet: 0, perUnit: 'za materiał', validity: '10 dni roboczych', applicableTo: 'materialy' },
+        { id: 'przeniesienie_materialu', service: 'Przeniesienie materiału szkoleniowego', priceNet: 3250, perUnit: 'za materiał', validity: 'jednorazowo', applicableTo: 'materialy' },
+        { id: 'przeniesienie_dostawcy', service: 'Przeniesienie dostawcy szkoleń', priceNet: 1200, perUnit: 'za dostawcę', validity: 'jednorazowo', applicableTo: 'dostawca' },
+        { id: 'utrzymanie_dostawcy', service: 'Roczne utrzymanie dostawcy na liście', priceNet: 1200, perUnit: 'za dostawcę', validity: 'rocznie', applicableTo: 'dostawca' },
+        { id: 'material_dostawca', service: 'Materiał powiązany z dostawcą', priceNet: 150, perUnit: 'za materiał', validity: 'rocznie', applicableTo: 'dostawca' },
+      ],
+      vatRate: 23,
+      note: 'Wszystkie kwoty netto PLN. Do cen należy doliczyć VAT 23%.',
+    })
+  );
+
   console.log('Seed complete.');
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
+import { calculateCost, CostLineItem } from '@/components/forms/CostEstimate';
 
 interface ApiAnswer {
   id: number;
@@ -105,6 +106,19 @@ export default function SubmissionDetail() {
   const [emailSending, setEmailSending] = useState(false);
 
   const [tokenCopied, setTokenCopied] = useState(false);
+
+  const [pricingData, setPricingData] = useState<{
+    items: { id: string; service: string; priceNet: number; perUnit: string; validity: string; applicableTo: string }[];
+    vatRate: number;
+    note: string;
+  } | null>(null);
+
+  useEffect(() => {
+    api
+      .get<typeof pricingData>('/form/pricing')
+      .then(setPricingData)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -379,6 +393,80 @@ export default function SubmissionDetail() {
           <p className="text-gray-500 text-sm">Brak odpowiedzi</p>
         )}
       </div>
+
+      {/* Szacowany koszt */}
+      {pricingData && submission && (() => {
+        const answers = submission.answers || [];
+        const langAnswer = answers.find((a) => a.question.fieldKey === 'language');
+        const language = langAnswer?.value || '';
+        const matAccredAnswer = answers.find((a) => a.question.fieldKey === 'materialAccreditationType');
+        const provAccredAnswer = answers.find((a) => a.question.fieldKey === 'providerAccreditationType');
+        const accreditationType = matAccredAnswer?.value || provAccredAnswer?.value || '';
+        const istqbAnswer = answers.find((a) => a.question.fieldKey === 'istqbProducts');
+        let productCount = 1;
+        if (istqbAnswer?.value) {
+          try {
+            const arr = JSON.parse(istqbAnswer.value);
+            if (Array.isArray(arr)) productCount = arr.length;
+          } catch { /* */ }
+        }
+
+        const { lines, totalNet, vatAmount, totalGross, vatRate } = calculateCost(
+          pricingData,
+          submission.applicationType as string[],
+          language,
+          accreditationType,
+          productCount
+        );
+
+        if (lines.length === 0) return null;
+
+        const fmt = (v: number) =>
+          v.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
+
+        return (
+          <div className="bg-yellow-50 border border-yellow-300 rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Szacowany koszt</h2>
+            <table className="w-full text-sm mb-4">
+              <thead>
+                <tr className="border-b border-yellow-300">
+                  <th className="text-left py-2 font-medium text-gray-700">Pozycja</th>
+                  <th className="text-right py-2 font-medium text-gray-700">Cena jedn.</th>
+                  <th className="text-right py-2 font-medium text-gray-700">Ilość</th>
+                  <th className="text-right py-2 font-medium text-gray-700">Kwota netto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-yellow-200">
+                {lines.map((line: CostLineItem, idx: number) => (
+                  <tr key={idx}>
+                    <td className="py-2">{line.label}</td>
+                    <td className="py-2 text-right">{fmt(line.unitPrice)}</td>
+                    <td className="py-2 text-right">{line.quantity}</td>
+                    <td className="py-2 text-right font-medium">{fmt(line.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-yellow-400">
+                <tr>
+                  <td colSpan={3} className="py-2 text-right font-medium">Razem netto:</td>
+                  <td className="py-2 text-right font-semibold">{fmt(totalNet)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="py-1 text-right text-gray-600">VAT ({vatRate}%):</td>
+                  <td className="py-1 text-right text-gray-600">{fmt(vatAmount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="py-2 text-right font-bold">Razem brutto:</td>
+                  <td className="py-2 text-right font-bold text-lg">{fmt(totalGross)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            <p className="text-xs text-gray-500 italic">
+              Szacunkowa kalkulacja — ostateczna kwota do potwierdzenia
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Consents */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">

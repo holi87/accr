@@ -13,6 +13,21 @@ interface NotificationTemplate {
   body: string;
 }
 
+interface PricingItem {
+  id: string;
+  service: string;
+  priceNet: number;
+  perUnit: string;
+  validity: string;
+  applicableTo: string;
+}
+
+interface PricingData {
+  items: PricingItem[];
+  vatRate: number;
+  note: string;
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -20,6 +35,11 @@ export default function Settings() {
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+
+  // Pricing
+  const [pricing, setPricing] = useState<PricingData>({ items: [], vatRate: 23, note: '' });
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [pricingSaving, setPricingSaving] = useState(false);
 
   // Individual settings
   const [confirmText, setConfirmText] = useState('');
@@ -30,6 +50,14 @@ export default function Settings() {
   // Email templates (parsed from JSON)
   const [confirmTemplate, setConfirmTemplate] = useState<EmailTemplate>({ enabled: false, subject: '', body: '' });
   const [notifyTemplate, setNotifyTemplate] = useState<NotificationTemplate>({ subject: '', body: '' });
+
+  useEffect(() => {
+    api
+      .get<PricingData>('/form/pricing')
+      .then(setPricing)
+      .catch(() => {})
+      .finally(() => setPricingLoading(false));
+  }, []);
 
   useEffect(() => {
     api
@@ -68,6 +96,53 @@ export default function Settings() {
     } finally {
       setSaving(null);
     }
+  };
+
+  const savePricing = async () => {
+    setPricingSaving(true);
+    setError('');
+    try {
+      await api.put('/admin/settings/pricing', { value: JSON.stringify(pricing) });
+      setSuccess('Cennik zapisany');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Nie udało się zapisać cennika');
+    } finally {
+      setPricingSaving(false);
+    }
+  };
+
+  const addPricingItem = () => {
+    setPricing((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: `item_${Date.now()}`,
+          service: '',
+          priceNet: 0,
+          perUnit: '',
+          validity: '',
+          applicableTo: 'materialy',
+        },
+      ],
+    }));
+  };
+
+  const removePricingItem = (index: number) => {
+    setPricing((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updatePricingItem = (index: number, field: keyof PricingItem, value: string | number) => {
+    setPricing((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      ),
+    }));
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,6 +284,126 @@ export default function Settings() {
         >
           {saving === 'email_template_notification' ? 'Zapisywanie...' : 'Zapisz szablon'}
         </button>
+      </div>
+
+      {/* Cennik */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold mb-4">Cennik usług akredytacyjnych</h2>
+        {pricingLoading ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 mb-4">
+              {pricing.items.map((item, idx) => (
+                <div key={idx} className="border rounded-lg p-3 bg-gray-50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-gray-400">ID: {item.id}</span>
+                    <button
+                      onClick={() => removePricingItem(idx)}
+                      className="text-red-500 hover:text-red-700 text-xs"
+                    >
+                      Usuń
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">ID pozycji</label>
+                      <input
+                        value={item.id}
+                        onChange={(e) => updatePricingItem(idx, 'id', e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Nazwa usługi</label>
+                      <input
+                        value={item.service}
+                        onChange={(e) => updatePricingItem(idx, 'service', e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Cena netto (PLN)</label>
+                      <input
+                        type="number"
+                        value={item.priceNet}
+                        onChange={(e) => updatePricingItem(idx, 'priceNet', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Jednostka</label>
+                      <input
+                        value={item.perUnit}
+                        onChange={(e) => updatePricingItem(idx, 'perUnit', e.target.value)}
+                        placeholder="np. za materiał"
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Ważność</label>
+                      <input
+                        value={item.validity}
+                        onChange={(e) => updatePricingItem(idx, 'validity', e.target.value)}
+                        placeholder="np. na czas obowiązywania sylabusa"
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Dotyczy</label>
+                      <select
+                        value={item.applicableTo}
+                        onChange={(e) => updatePricingItem(idx, 'applicableTo', e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="materialy">Materiały</option>
+                        <option value="dostawca">Dostawca</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={addPricingItem}
+              className="mb-4 px-3 py-1.5 border border-dashed border-gray-400 rounded text-sm text-gray-600 hover:bg-gray-50 w-full"
+            >
+              + Dodaj pozycję cennika
+            </button>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Stawka VAT (%)</label>
+                <input
+                  type="number"
+                  value={pricing.vatRate}
+                  onChange={(e) => setPricing((prev) => ({ ...prev, vatRate: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Uwaga do cennika</label>
+                <input
+                  value={pricing.note}
+                  onChange={(e) => setPricing((prev) => ({ ...prev, note: e.target.value }))}
+                  placeholder="np. Ceny nie zawierają podatku VAT"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={savePricing}
+              disabled={pricingSaving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              {pricingSaving ? 'Zapisywanie...' : 'Zapisz cennik'}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Gmail configuration */}

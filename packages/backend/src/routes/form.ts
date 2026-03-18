@@ -196,20 +196,28 @@ export async function formRoutes(app: FastifyInstance) {
     };
   });
 
-  // GET /api/form/pricing — public pricing info
+  // GET /api/form/pricing — public pricing info (from DB)
   app.get('/form/pricing', async () => {
-    return {
-      pricing: [
-        { service: 'Akredytacja materiału — j. polski', price: '7 000,00', unit: 'netto PLN', validity: 'na czas obowiązywania sylabusa' },
-        { service: 'Akredytacja materiału — j. angielski', price: '8 000,00', unit: 'netto PLN', validity: 'na czas obowiązywania sylabusa' },
-        { service: 'Przeniesienie materiału szkoleniowego', price: '3 250,00', unit: 'netto PLN', validity: 'jednorazowo za materiał' },
-        { service: 'Przeniesienie dostawcy szkoleń', price: '1 200,00', unit: 'netto PLN', validity: 'jednorazowo za dostawcę' },
-        { service: 'Roczne utrzymanie dostawcy na liście', price: '1 200,00', unit: 'netto PLN', validity: 'rocznie za dostawcę' },
-        { service: 'Materiał powiązany z dostawcą', price: '150,00', unit: 'netto PLN', validity: 'rocznie za materiał' },
-        { service: 'Crossakredytacja', price: '0,00', unit: 'netto PLN', validity: '10 dni roboczych' },
-      ],
-      vat: '23%',
-      note: 'Do cen należy doliczyć VAT 23%. Crossakredytacja jest bezpłatna.',
-    };
+    const setting = await app.prisma.setting.findUnique({ where: { key: 'pricing' } });
+    if (setting) {
+      try { return JSON.parse(setting.value); } catch { /* fallback */ }
+    }
+    return getDefaultPricing();
   });
+}
+
+export function getDefaultPricing() {
+  return {
+    items: [
+      { id: 'akredytacja_pl', service: 'Akredytacja materiału — j. polski', priceNet: 7000, perUnit: 'za materiał', validity: 'na czas obowiązywania sylabusa', applicableTo: 'materialy' },
+      { id: 'akredytacja_en', service: 'Akredytacja materiału — j. angielski', priceNet: 8000, perUnit: 'za materiał', validity: 'na czas obowiązywania sylabusa', applicableTo: 'materialy' },
+      { id: 'crossakredytacja', service: 'Crossakredytacja materiału', priceNet: 0, perUnit: 'za materiał', validity: '10 dni roboczych', applicableTo: 'materialy' },
+      { id: 'przeniesienie_materialu', service: 'Przeniesienie materiału szkoleniowego', priceNet: 3250, perUnit: 'za materiał', validity: 'jednorazowo', applicableTo: 'materialy' },
+      { id: 'przeniesienie_dostawcy', service: 'Przeniesienie dostawcy szkoleń', priceNet: 1200, perUnit: 'za dostawcę', validity: 'jednorazowo', applicableTo: 'dostawca' },
+      { id: 'utrzymanie_dostawcy', service: 'Roczne utrzymanie dostawcy na liście', priceNet: 1200, perUnit: 'za dostawcę', validity: 'rocznie', applicableTo: 'dostawca' },
+      { id: 'material_dostawca', service: 'Materiał powiązany z dostawcą', priceNet: 150, perUnit: 'za materiał', validity: 'rocznie', applicableTo: 'dostawca' },
+    ],
+    vatRate: 23,
+    note: 'Wszystkie kwoty netto PLN. Do cen należy doliczyć VAT 23%.',
+  };
 }
