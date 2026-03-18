@@ -5,6 +5,7 @@ import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { healthRoutes } from './routes/health.js';
@@ -50,26 +51,47 @@ export async function buildApp(opts?: { logger?: boolean }) {
   await app.register(adminSettingsRoutes, { prefix: '/api/admin' });
   await app.register(adminUserRoutes, { prefix: '/api/admin' });
 
-  // In production, serve frontend SPA (register first to get reply.sendFile decorator)
-  if (process.env.NODE_ENV === 'production') {
-    const publicDir = path.resolve(__dirname, '../public');
-    await app.register(fastifyStatic, {
-      root: publicDir,
-      prefix: '/',
-      decorateReply: true,
-    });
-    app.setNotFoundHandler((_req, reply) => {
-      return reply.sendFile('index.html');
-    });
-  }
-
   // Serve uploaded files
   const uploadDir = process.env.UPLOAD_DIR || './uploads';
   await app.register(fastifyStatic, {
     root: path.resolve(uploadDir),
     prefix: '/uploads/',
-    decorateReply: false,
   });
+
+  // In production, serve frontend SPA
+  if (process.env.NODE_ENV === 'production') {
+    const publicDir = path.resolve(__dirname, '../public');
+    const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'));
+
+    // Serve static assets (js, css, images)
+    app.get('/assets/*', (request, reply) => {
+      const filePath = path.join(publicDir, request.url);
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filePath).slice(1);
+        const mimeTypes: Record<string, string> = {
+          js: 'application/javascript',
+          css: 'text/css',
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          svg: 'image/svg+xml',
+          ico: 'image/x-icon',
+          woff: 'font/woff',
+          woff2: 'font/woff2',
+        };
+        return reply.type(mimeTypes[ext] || 'application/octet-stream').send(fs.readFileSync(filePath));
+      }
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    });
+
+    // SPA fallback — all non-API, non-asset routes serve index.html
+    app.setNotFoundHandler((request, reply) => {
+      // Don't intercept API routes
+      if (request.url.startsWith('/api/')) {
+        return reply.status(404).send({ error: 'NOT_FOUND', message: 'Endpoint nie znaleziony' });
+      }
+      return reply.type('text/html').send(indexHtml);
+    });
+  }
 
   // Cleanup on close
   app.addHook('onClose', async () => {
