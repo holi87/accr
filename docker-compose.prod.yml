@@ -1,0 +1,27 @@
+services:
+  app:
+    image: ghcr.io/holi87/accr:latest
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    env_file: .env
+    volumes: [uploads:/app/uploads]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: sjsi_accreditation
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  uploads:

@@ -30,5 +30,8 @@ build/
 # Logs
 *.log
 
+# Uploads
+uploads/
+
 # Docs (local specs)
 docs/
