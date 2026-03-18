@@ -2,11 +2,20 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/server.js';
 import { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
+import { execSync } from 'child_process';
 
 let app: FastifyInstance;
 const prisma = new PrismaClient();
 
 beforeAll(async () => {
+  // Ensure seed data exists (CI may not have it or other tests may have cleaned it)
+  const sectionCount = await prisma.section.count();
+  if (sectionCount === 0) {
+    execSync('npx tsx prisma/seed.ts', {
+      cwd: new URL('../../', import.meta.url).pathname,
+      env: { ...process.env },
+    });
+  }
   app = await buildApp({ logger: false });
 });
 
@@ -41,6 +50,7 @@ describe('POST /api/form/submit', () => {
       url: '/api/form/submit',
       payload: { applicationType: ['materialy'], entityType: 'fizyczna', answers: [] },
     });
+    // With seed data there are required questions, so empty answers = 400
     expect(res.statusCode).toBe(400);
     expect(res.json().details).toBeDefined();
   });
@@ -70,7 +80,9 @@ describe('POST /api/form/submit', () => {
 
     // Build answers for materialy + fizyczna path
     const answers: { questionId: number; value: string }[] = [];
-    const allQuestions = sections.flatMap((s: { questions: Array<{ id: number; fieldKey: string; showWhen: Record<string, unknown> | null; type: string; isConsent: boolean }> }) => s.questions);
+    const allQuestions = sections.flatMap(
+      (s: { questions: Array<{ id: number; fieldKey: string; showWhen: Record<string, unknown> | null; type: string; isConsent: boolean; options: unknown }> }) => s.questions
+    );
 
     for (const q of allQuestions) {
       if (q.fieldKey === 'applicationType' || q.fieldKey === 'entityType') continue;
@@ -82,7 +94,7 @@ describe('POST /api/form/submit', () => {
           v.toLowerCase().includes('materiał') || v.toLowerCase().includes('material') || v === 'materialy'
         )) continue;
         if (sw.entityType && !(sw.entityType as string).toLowerCase().includes('fizyczn')) continue;
-        if (sw.multipleProducts) continue; // skip multiple products field
+        if (sw.multipleProducts) continue;
       }
 
       let value = '';
@@ -91,7 +103,10 @@ describe('POST /api/form/submit', () => {
       else if (q.type === 'CHECKBOX_CONSENT') value = 'true';
       else if (q.fieldKey === 'istqbProducts') value = JSON.stringify(['CTFL v4.0']);
       else if (q.type === 'SELECT') value = 'polski';
-      else if (q.type === 'RADIO') value = (q as unknown as { options: string[] }).options?.[0] || 'option';
+      else if (q.type === 'RADIO') {
+        const opts = q.options as string[] | null;
+        value = opts?.[0] || 'option';
+      }
       else if (q.type === 'MULTI_SELECT' && q.fieldKey !== 'istqbProducts') value = JSON.stringify(['option1']);
       else value = 'Test answer';
 

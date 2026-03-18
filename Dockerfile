@@ -5,8 +5,8 @@ COPY packages/backend/package.json packages/backend/
 COPY packages/frontend/package.json packages/frontend/
 RUN npm ci
 COPY . .
-RUN npm run build
 RUN npx prisma generate --schema=packages/backend/prisma/schema.prisma
+RUN npm run build
 
 FROM node:20-alpine
 WORKDIR /app
