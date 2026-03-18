@@ -108,61 +108,11 @@ export default function FormField({ question, value, onChange, error }: Props) {
 }
 
 function MultiSelectField({ question, value, onChange, error }: Props) {
-  const options = question.options as unknown;
-  let items: string[] = [];
+  const rawOptions = question.options as unknown;
 
-  if (Array.isArray(options)) {
-    // Flat array or grouped
-    if (typeof options[0] === 'string') {
-      items = options as string[];
-    } else {
-      // grouped options: [{group: "...", items: ["..."]}]
-      const grouped = options as { group: string; items: string[] }[];
-      // Render with groups
-      let selected: string[] = [];
-      try { selected = JSON.parse(value) || []; } catch { selected = []; }
+  // Normalize options to grouped format: [{ group, items }]
+  const grouped = normalizeToGrouped(rawOptions);
 
-      const toggle = (item: string) => {
-        const next = selected.includes(item)
-          ? selected.filter((s) => s !== item)
-          : [...selected, item];
-        onChange(JSON.stringify(next));
-      };
-
-      return (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {question.label} {question.required && <span className="text-red-500">*</span>}
-          </label>
-          {question.helpText && <p className="text-xs text-gray-500 mb-1">{question.helpText}</p>}
-          <div className="border rounded-lg p-3 max-h-64 overflow-y-auto space-y-3">
-            {grouped.map((g) => (
-              <div key={g.group}>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{g.group}</p>
-                {g.items.map((item) => (
-                  <label key={item} className="flex items-center gap-2 py-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(item)}
-                      onChange={() => toggle(item)}
-                      className="w-4 h-4 text-primary"
-                    />
-                    <span className="text-sm">{item}</span>
-                  </label>
-                ))}
-              </div>
-            ))}
-          </div>
-          {selected.length > 0 && (
-            <p className="text-xs text-gray-500 mt-1">Wybrano: {selected.length}</p>
-          )}
-          {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
-        </div>
-      );
-    }
-  }
-
-  // Flat list fallback
   let selected: string[] = [];
   try { selected = JSON.parse(value) || []; } catch { selected = []; }
 
@@ -173,25 +123,87 @@ function MultiSelectField({ question, value, onChange, error }: Props) {
     onChange(JSON.stringify(next));
   };
 
+  if (grouped.length > 0) {
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {question.label} {question.required && <span className="text-red-500">*</span>}
+        </label>
+        {question.helpText && <p className="text-xs text-gray-500 mb-1">{question.helpText}</p>}
+        <div className="border rounded-lg p-3 max-h-72 overflow-y-auto space-y-3">
+          {grouped.map((g) => (
+            <div key={g.group}>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{g.group}</p>
+              {g.items.map((item) => (
+                <label key={item} className="flex items-center gap-2 py-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(item)}
+                    onChange={() => toggle(item)}
+                    className="w-4 h-4 text-primary"
+                  />
+                  <span className="text-sm">{item}</span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Wybrano: {selected.length}</p>
+        )}
+        {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
+      </div>
+    );
+  }
+
+  // Flat list fallback (no groups)
+  const flatItems = Array.isArray(rawOptions) ? (rawOptions as string[]) : [];
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {question.label} {question.required && <span className="text-red-500">*</span>}
       </label>
-      <div className="space-y-1">
-        {items.map((item) => (
-          <label key={item} className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selected.includes(item)}
-              onChange={() => toggle(item)}
-              className="w-4 h-4 text-primary"
-            />
-            <span className="text-sm">{item}</span>
-          </label>
-        ))}
-      </div>
+      {flatItems.length > 0 ? (
+        <div className="space-y-1">
+          {flatItems.map((item) => (
+            <label key={String(item)} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.includes(String(item))}
+                onChange={() => toggle(String(item))}
+                className="w-4 h-4 text-primary"
+              />
+              <span className="text-sm">{String(item)}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">Brak opcji</p>
+      )}
       {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
     </div>
   );
+}
+
+/** Normalize various option formats to [{ group, items }] */
+function normalizeToGrouped(options: unknown): { group: string; items: string[] }[] {
+  if (!options || typeof options !== 'object') return [];
+
+  // Format 1: [{ group: "...", items: ["..."] }] — already grouped array
+  if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && options[0] !== null && 'group' in options[0]) {
+    return options as { group: string; items: string[] }[];
+  }
+
+  // Format 2: { "Group Name": ["item1", "item2"] } — object with group keys
+  if (!Array.isArray(options) && typeof options === 'object') {
+    const entries = Object.entries(options as Record<string, unknown>);
+    if (entries.length > 0 && Array.isArray(entries[0][1])) {
+      return entries.map(([group, items]) => ({
+        group,
+        items: (items as string[]).map(String),
+      }));
+    }
+  }
+
+  return [];
 }

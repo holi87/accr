@@ -364,10 +364,17 @@ function IstqbProductsEditor({ sections, setSections, setError, setSuccess }: {
   useEffect(() => {
     if (istqbQuestion?.options) {
       const opts = istqbQuestion.options;
-      if (Array.isArray(opts) && opts.length > 0 && typeof opts[0] === 'object' && 'group' in opts[0]) {
+      // Format 1: [{ group, items }] — already grouped array
+      if (Array.isArray(opts) && opts.length > 0 && typeof opts[0] === 'object' && 'group' in (opts[0] as Record<string, unknown>)) {
         setGroups(opts as IstqbGroup[]);
-      } else if (Array.isArray(opts)) {
-        // Flat array — wrap in single group
+      }
+      // Format 2: { "Group Name": ["item1", "item2"] } — object with group keys (from seed)
+      else if (!Array.isArray(opts) && typeof opts === 'object' && opts !== null) {
+        const entries = Object.entries(opts as Record<string, string[]>);
+        setGroups(entries.map(([group, items]) => ({ group, items })));
+      }
+      // Format 3: flat string array
+      else if (Array.isArray(opts) && typeof opts[0] === 'string') {
         setGroups([{ group: 'Produkty', items: opts as string[] }]);
       }
     }
