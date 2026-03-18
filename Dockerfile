@@ -16,8 +16,9 @@ COPY --from=builder /app/packages/backend/prisma ./prisma
 COPY --from=builder /app/packages/frontend/dist ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/packages/backend/package.json ./packages/backend/package.json
 ENV NODE_ENV=production
 EXPOSE 3000
 VOLUME ["/app/uploads"]
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && npx tsx prisma/seed.ts && node dist/server.js"]
