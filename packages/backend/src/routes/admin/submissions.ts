@@ -143,7 +143,7 @@ export async function adminSubmissionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Zgłoszenie nie znalezione' });
     }
 
-    const emailAnswer = submission.answers.find((a) => a.question.fieldKey === 'email');
+    const emailAnswer = submission.answers.find((a: { question: { fieldKey: string }; value: string }) => a.question.fieldKey === 'email');
     const toAddress = emailAnswer?.value || '';
 
     // Log email (actual sending is TODO — Gmail API integration)

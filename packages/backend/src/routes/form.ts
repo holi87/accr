@@ -53,7 +53,7 @@ export async function formRoutes(app: FastifyInstance) {
     const answerMap = new Map(answers.map((a) => [a.questionId, a.value]));
 
     // Check how many ISTQB products are selected (for multipleProducts condition)
-    const istqbQuestion = allQuestions.find((q) => q.fieldKey === 'istqbProducts');
+    const istqbQuestion = allQuestions.find((question) => question.fieldKey === 'istqbProducts');
     let multipleProducts = false;
     if (istqbQuestion) {
       const istqbAnswer = answerMap.get(istqbQuestion.id);
@@ -134,10 +134,10 @@ export async function formRoutes(app: FastifyInstance) {
           create: answers
             .filter((a) => {
               // Only save answers for visible questions
-              const q = allQuestions.find((q) => q.id === a.questionId);
-              if (!q) return false;
-              if (q.fieldKey === 'applicationType' || q.fieldKey === 'entityType') return false;
-              return evaluateShowWhen(q.showWhen, context);
+              const found = allQuestions.find((question) => question.id === a.questionId);
+              if (!found) return false;
+              if (found.fieldKey === 'applicationType' || found.fieldKey === 'entityType') return false;
+              return evaluateShowWhen(found.showWhen, context);
             })
             .map((a) => ({
               questionId: a.questionId,
