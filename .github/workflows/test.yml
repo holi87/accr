@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
+      - run: npx prisma generate --schema=packages/backend/prisma/schema.prisma
       - run: npx prisma migrate deploy --schema=packages/backend/prisma/schema.prisma
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/sjsi_test
