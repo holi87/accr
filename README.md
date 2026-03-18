@@ -37,9 +37,10 @@ Aplikacja dostępna pod:
 
 ### Formularz publiczny
 
-- `/` — strona główna z opisem procesu
+- `/` — strona główna z opisem procesu i cennikiem
 - `/form` — formularz akredytacyjny (5 kroków)
-- `/confirmation/:id` — potwierdzenie złożenia wniosku
+- `/confirmation/:id` — potwierdzenie złożenia wniosku + link śledzenia
+- `/track/:token` — publiczne śledzenie statusu zgłoszenia (bez logowania)
 
 ### Panel administracyjny (backoffice)
 
@@ -124,6 +125,10 @@ npm test
 
 - **test.yml** — testy na każdy push/PR do main (Postgres service container)
 - **docker-build.yml** — build + push do GHCR (linux/amd64 + linux/arm64)
+
+## Workflow akredytacji
+
+Szczegółowy opis procesu, statusów, iteracji, cennika i linku śledzenia: **[WORKFLOW.md](WORKFLOW.md)**
 
 ## Licencja
 
