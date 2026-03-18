@@ -74,7 +74,10 @@ export async function adminSettingsRoutes(app: FastifyInstance) {
     if (!setting || !fs.existsSync(setting.value)) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Logo nie znalezione' });
     }
-    return reply.sendFile(path.basename(setting.value));
+    const ext = path.extname(setting.value).slice(1).toLowerCase();
+    const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'png' ? 'image/png' : 'image/jpeg';
+    const fileBuffer = fs.readFileSync(setting.value);
+    return reply.type(mime).send(fileBuffer);
   });
 
   // POST /admin/settings/test-email

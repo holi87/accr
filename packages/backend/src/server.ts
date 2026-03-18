@@ -50,6 +50,19 @@ export async function buildApp(opts?: { logger?: boolean }) {
   await app.register(adminSettingsRoutes, { prefix: '/api/admin' });
   await app.register(adminUserRoutes, { prefix: '/api/admin' });
 
+  // In production, serve frontend SPA (register first to get reply.sendFile decorator)
+  if (process.env.NODE_ENV === 'production') {
+    const publicDir = path.resolve(__dirname, '../public');
+    await app.register(fastifyStatic, {
+      root: publicDir,
+      prefix: '/',
+      decorateReply: true,
+    });
+    app.setNotFoundHandler((_req, reply) => {
+      return reply.sendFile('index.html');
+    });
+  }
+
   // Serve uploaded files
   const uploadDir = process.env.UPLOAD_DIR || './uploads';
   await app.register(fastifyStatic, {
@@ -57,19 +70,6 @@ export async function buildApp(opts?: { logger?: boolean }) {
     prefix: '/uploads/',
     decorateReply: false,
   });
-
-  // In production, serve frontend SPA
-  if (process.env.NODE_ENV === 'production') {
-    const publicDir = path.resolve(__dirname, '../public');
-    await app.register(fastifyStatic, {
-      root: publicDir,
-      prefix: '/',
-      decorateReply: false,
-    });
-    app.setNotFoundHandler((_req, reply) => {
-      reply.sendFile('index.html', publicDir);
-    });
-  }
 
   // Cleanup on close
   app.addHook('onClose', async () => {
