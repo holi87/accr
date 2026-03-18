@@ -2,20 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/api';
 
-interface Submission {
-  id: string;
-  type: string;
+interface ApiSubmission {
+  id: number;
+  applicationType: string[];
   entityType: string;
-  email: string;
   status: string;
   createdAt: string;
+  answers: Array<{
+    value: string;
+    question: { fieldKey: string; label: string };
+  }>;
 }
 
 interface SubmissionsResponse {
-  submissions: Submission[];
-  total: number;
-  page: number;
-  limit: number;
+  submissions: ApiSubmission[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -31,6 +32,22 @@ const STATUS_COLORS: Record<string, string> = {
   ZAAKCEPTOWANE: 'bg-green-100 text-green-800',
   ODRZUCONE: 'bg-red-100 text-red-800',
 };
+
+function getAnswerValue(submission: ApiSubmission, fieldKey: string): string {
+  const answer = submission.answers.find((a) => a.question.fieldKey === fieldKey);
+  return answer?.value || '—';
+}
+
+function formatType(applicationType: string[]): string {
+  return applicationType
+    .map((t) => {
+      const l = t.toLowerCase();
+      if (l.includes('materiał') || l.includes('material') || l === 'materialy') return 'Materiały';
+      if (l.includes('dostawc') || l === 'dostawca') return 'Dostawca';
+      return t;
+    })
+    .join(' + ');
+}
 
 export default function SubmissionsList() {
   const navigate = useNavigate();
@@ -71,7 +88,7 @@ export default function SubmissionsList() {
     fetchData();
   }, [fetchData]);
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
+  const totalPages = data?.pagination.totalPages || 0;
 
   const updateParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -151,10 +168,12 @@ export default function SubmissionsList() {
                     onClick={() => navigate(`/admin/submissions/${s.id}`)}
                     className="hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-4 py-3 font-mono text-xs">{s.id.slice(0, 8)}</td>
-                    <td className="px-4 py-3">{s.type}</td>
-                    <td className="px-4 py-3">{s.entityType}</td>
-                    <td className="px-4 py-3">{s.email}</td>
+                    <td className="px-4 py-3 font-mono text-xs">#{s.id}</td>
+                    <td className="px-4 py-3">{formatType(s.applicationType as string[])}</td>
+                    <td className="px-4 py-3">
+                      {s.entityType === 'fizyczna' ? 'Os. fizyczna' : 'Os. prawna'}
+                    </td>
+                    <td className="px-4 py-3">{getAnswerValue(s, 'email')}</td>
                     <td className="px-4 py-3">
                       {new Date(s.createdAt).toLocaleDateString('pl-PL')}
                     </td>
@@ -181,7 +200,7 @@ export default function SubmissionsList() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-gray-500">
-                Strona {page} z {totalPages} (łącznie {data?.total})
+                Strona {page} z {totalPages} (łącznie {data?.pagination.total})
               </p>
               <div className="flex gap-2">
                 <button

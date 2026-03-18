@@ -2,41 +2,43 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 
-interface Note {
-  id: string;
-  content: string;
-  authorName: string;
-  createdAt: string;
+interface ApiAnswer {
+  id: number;
+  value: string;
+  question: {
+    fieldKey: string;
+    label: string;
+    type: string;
+    isConsent: boolean;
+    consentText: string | null;
+    sectionId: number;
+  };
 }
 
-interface EmailLog {
-  id: string;
+interface ApiNote {
+  id: number;
+  content: string;
+  createdAt: string;
+  author: { id: number; name: string };
+}
+
+interface ApiEmailLog {
+  id: number;
   subject: string;
+  toAddress: string;
+  status: string;
   sentAt: string;
 }
 
-interface Consent {
-  label: string;
-  text: string;
-  accepted: boolean;
-}
-
-interface AnswerSection {
-  sectionLabel: string;
-  answers: { label: string; value: string }[];
-}
-
-interface Submission {
-  id: string;
-  type: string;
+interface ApiSubmission {
+  id: number;
+  applicationType: string[];
   entityType: string;
-  email: string;
   status: string;
   createdAt: string;
-  sections: AnswerSection[];
-  consents: Consent[];
-  notes: Note[];
-  emailLogs: EmailLog[];
+  answers: ApiAnswer[];
+  notes: ApiNote[];
+  emails: ApiEmailLog[];
 }
 
 const STATUSES = ['NOWE', 'W_TRAKCIE', 'ZAAKCEPTOWANE', 'ODRZUCONE'] as const;
@@ -47,11 +49,22 @@ const STATUS_LABELS: Record<string, string> = {
   ODRZUCONE: 'Odrzucone',
 };
 
+function formatType(applicationType: string[]): string {
+  return applicationType
+    .map((t) => {
+      const l = t.toLowerCase();
+      if (l.includes('materiał') || l.includes('material') || l === 'materialy') return 'Materiały';
+      if (l.includes('dostawc') || l === 'dostawca') return 'Dostawca';
+      return t;
+    })
+    .join(' + ');
+}
+
 export default function SubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [submission, setSubmission] = useState<Submission | null>(null);
+  const [submission, setSubmission] = useState<ApiSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -68,7 +81,7 @@ export default function SubmissionDetail() {
     if (!id) return;
     setLoading(true);
     api
-      .get<Submission>(`/admin/submissions/${id}`)
+      .get<ApiSubmission>(`/admin/submissions/${id}`)
       .then(setSubmission)
       .catch((err) => {
         if (err?.status === 401) {
@@ -98,11 +111,11 @@ export default function SubmissionDetail() {
     if (!id || !noteContent.trim() || noteSubmitting) return;
     setNoteSubmitting(true);
     try {
-      const note = await api.post<Note>(`/admin/submissions/${id}/notes`, {
+      const note = await api.post<ApiNote>(`/admin/submissions/${id}/notes`, {
         content: noteContent,
       });
       setSubmission((prev) =>
-        prev ? { ...prev, notes: [...prev.notes, note] } : prev,
+        prev ? { ...prev, notes: [note, ...prev.notes] } : prev,
       );
       setNoteContent('');
     } catch {
@@ -117,12 +130,12 @@ export default function SubmissionDetail() {
     if (!id || emailSending) return;
     setEmailSending(true);
     try {
-      const log = await api.post<EmailLog>(`/admin/submissions/${id}/email`, {
+      const log = await api.post<ApiEmailLog>(`/admin/submissions/${id}/email`, {
         subject: emailSubject,
         body: emailBody,
       });
       setSubmission((prev) =>
-        prev ? { ...prev, emailLogs: [...prev.emailLogs, log] } : prev,
+        prev ? { ...prev, emails: [log, ...prev.emails] } : prev,
       );
       setEmailSubject('');
       setEmailBody('');
@@ -148,6 +161,11 @@ export default function SubmissionDetail() {
 
   if (!submission) return null;
 
+  const regularAnswers = (submission.answers || []).filter((a) => !a.question.isConsent);
+  const consents = (submission.answers || []).filter((a) => a.question.isConsent);
+  const emailAnswer = (submission.answers || []).find((a) => a.question.fieldKey === 'email');
+  const applicantEmail = emailAnswer?.value || '—';
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <button
@@ -165,17 +183,19 @@ export default function SubmissionDetail() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold">Zgłoszenie #{submission.id.slice(0, 8)}</h1>
+            <h1 className="text-xl font-bold">Zgłoszenie #{submission.id}</h1>
             <div className="flex flex-wrap gap-2 mt-2">
-              <span className="px-2 py-1 bg-gray-100 rounded text-xs">{submission.type}</span>
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                {formatType(submission.applicationType as string[])}
+              </span>
               <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                {submission.entityType}
+                {submission.entityType === 'fizyczna' ? 'Osoba fizyczna' : 'Osoba prawna'}
               </span>
               <span className="text-xs text-gray-500">
                 {new Date(submission.createdAt).toLocaleString('pl-PL')}
               </span>
             </div>
-            <p className="text-sm text-gray-600 mt-1">{submission.email}</p>
+            <p className="text-sm text-gray-600 mt-1">{applicantEmail}</p>
           </div>
 
           <div>
@@ -196,25 +216,23 @@ export default function SubmissionDetail() {
         </div>
       </div>
 
-      {/* Answers by section */}
+      {/* Answers */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Odpowiedzi</h2>
-        {submission.sections.map((section, i) => (
-          <div key={i} className="mb-6 last:mb-0">
-            <h3 className="font-medium text-sm text-gray-700 border-b pb-2 mb-3">
-              {section.sectionLabel}
-            </h3>
-            <dl className="space-y-2">
-              {section.answers.map((a, j) => (
-                <div key={j} className="grid grid-cols-3 gap-2 text-sm">
-                  <dt className="text-gray-500">{a.label}</dt>
-                  <dd className="col-span-2">{a.value || '—'}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ))}
-        {submission.sections.length === 0 && (
+        {regularAnswers.length > 0 ? (
+          <dl className="space-y-3">
+            {regularAnswers.map((a) => (
+              <div key={a.id} className="grid grid-cols-3 gap-2 text-sm py-2 border-b border-gray-100 last:border-0">
+                <dt className="text-gray-500">{a.question.label}</dt>
+                <dd className="col-span-2 break-words">
+                  {a.question.type === 'MULTI_SELECT' ? (() => {
+                    try { return JSON.parse(a.value).join(', '); } catch { return a.value; }
+                  })() : a.value || '—'}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
           <p className="text-gray-500 text-sm">Brak odpowiedzi</p>
         )}
       </div>
@@ -222,16 +240,21 @@ export default function SubmissionDetail() {
       {/* Consents */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Zgody</h2>
-        {submission.consents.map((c, i) => (
-          <div key={i} className="flex items-start gap-3 mb-3 last:mb-0">
-            <span className="text-lg">{c.accepted ? '\u2705' : '\u274C'}</span>
-            <div>
-              <p className="text-sm font-medium">{c.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{c.text}</p>
-            </div>
+        {consents.length > 0 ? (
+          <div className="space-y-3">
+            {consents.map((c) => (
+              <div key={c.id} className="flex items-start gap-3">
+                <span className="text-lg flex-shrink-0">{c.value === 'true' ? '✅' : '❌'}</span>
+                <div>
+                  <p className="text-sm font-medium">{c.question.label}</p>
+                  {c.question.consentText && (
+                    <p className="text-xs text-gray-500 mt-0.5">{c.question.consentText}</p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-        {submission.consents.length === 0 && (
+        ) : (
           <p className="text-gray-500 text-sm">Brak zgód</p>
         )}
       </div>
@@ -239,12 +262,12 @@ export default function SubmissionDetail() {
       {/* Notes */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Notatki</h2>
-        {submission.notes.length > 0 ? (
+        {(submission.notes || []).length > 0 ? (
           <div className="space-y-3 mb-4">
             {submission.notes.map((note) => (
               <div key={note.id} className="p-3 bg-gray-50 rounded text-sm">
                 <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>{note.authorName}</span>
+                  <span>{note.author.name}</span>
                   <span>{new Date(note.createdAt).toLocaleString('pl-PL')}</span>
                 </div>
                 <p>{note.content}</p>
@@ -288,6 +311,9 @@ export default function SubmissionDetail() {
         {emailOpen && (
           <form onSubmit={handleSendEmail} className="mb-6 p-4 border rounded-lg space-y-3">
             <div>
+              <label className="block text-sm font-medium mb-1">Do: {applicantEmail}</label>
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-1">Temat</label>
               <input
                 type="text"
@@ -317,11 +343,14 @@ export default function SubmissionDetail() {
           </form>
         )}
 
-        {submission.emailLogs.length > 0 ? (
+        {(submission.emails || []).length > 0 ? (
           <div className="space-y-2">
-            {submission.emailLogs.map((log) => (
+            {submission.emails.map((log) => (
               <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded text-sm">
-                <span>{log.subject}</span>
+                <div>
+                  <span className="font-medium">{log.subject}</span>
+                  <span className="text-xs text-gray-500 ml-2">→ {log.toAddress}</span>
+                </div>
                 <span className="text-xs text-gray-500">
                   {new Date(log.sentAt).toLocaleString('pl-PL')}
                 </span>

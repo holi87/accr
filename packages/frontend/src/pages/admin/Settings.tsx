@@ -2,15 +2,24 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 
-interface Setting {
+const SETTING_LABELS: Record<string, string> = {
+  confirm_page_text: 'Tekst strony potwierdzenia',
+  gmail_credentials: 'Gmail API — credentials (JSON)',
+  gmail_sender: 'Gmail — adres nadawcy',
+  notification_emails: 'Emaile powiadomień (JSON array)',
+  email_template_confirmation: 'Szablon emaila potwierdzenia (JSON)',
+  email_template_notification: 'Szablon emaila powiadomienia (JSON)',
+  logo_path: 'Ścieżka do logo',
+};
+
+interface SettingEntry {
   key: string;
   value: string;
-  label: string;
 }
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState<Setting[]>([]);
+  const [settings, setSettings] = useState<SettingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
@@ -19,8 +28,12 @@ export default function Settings() {
 
   useEffect(() => {
     api
-      .get<{ settings: Setting[] }>('/admin/settings')
-      .then((data) => setSettings(data.settings))
+      .get<{ settings: Record<string, string> }>('/admin/settings')
+      .then((data) => {
+        // API returns { settings: { key: value, ... } } — convert to array
+        const entries = Object.entries(data.settings).map(([key, value]) => ({ key, value }));
+        setSettings(entries);
+      })
       .catch((err) => {
         if (err?.status === 401) {
           navigate('/admin/login');
@@ -37,10 +50,10 @@ export default function Settings() {
     setSuccess('');
     try {
       await api.put(`/admin/settings/${key}`, { value });
-      setSuccess(`Zapisano: ${key}`);
+      setSuccess(`Zapisano: ${SETTING_LABELS[key] || key}`);
       setTimeout(() => setSuccess(''), 3000);
     } catch {
-      setError(`Nie udało się zapisać ustawienia: ${key}`);
+      setError(`Nie udało się zapisać ustawienia`);
     } finally {
       setSaving(null);
     }
@@ -90,26 +103,39 @@ export default function Settings() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Ustawienia ogólne</h2>
         <div className="space-y-4">
-          {settings.map((setting) => (
-            <div key={setting.key}>
-              <label className="block text-sm font-medium mb-1">{setting.label}</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={setting.value}
-                  onChange={(e) => updateSettingValue(setting.key, e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={() => handleSave(setting.key, setting.value)}
-                  disabled={saving === setting.key}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving === setting.key ? 'Zapisywanie...' : 'Zapisz'}
-                </button>
+          {settings
+            .filter((s) => s.key !== 'logo_path')
+            .map((setting) => (
+              <div key={setting.key}>
+                <label className="block text-sm font-medium mb-1">
+                  {SETTING_LABELS[setting.key] || setting.key}
+                </label>
+                <div className="flex gap-2">
+                  {setting.value.length > 100 ? (
+                    <textarea
+                      value={setting.value}
+                      onChange={(e) => updateSettingValue(setting.key, e.target.value)}
+                      rows={4}
+                      className="flex-1 px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={setting.value}
+                      onChange={(e) => updateSettingValue(setting.key, e.target.value)}
+                      className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
+                  <button
+                    onClick={() => handleSave(setting.key, setting.value)}
+                    disabled={saving === setting.key}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 self-start"
+                  >
+                    {saving === setting.key ? '...' : 'Zapisz'}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           {settings.length === 0 && (
             <p className="text-gray-500 text-sm">Brak ustawień do wyświetlenia</p>
           )}
@@ -119,11 +145,11 @@ export default function Settings() {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-4">Logo</h2>
         <p className="text-sm text-gray-500 mb-3">
-          Prześlij logo organizacji wyświetlane w formularzu.
+          Prześlij logo organizacji (PNG, JPG, SVG, max 2MB).
         </p>
         <input
           type="file"
-          accept="image/*"
+          accept=".png,.jpg,.jpeg,.svg"
           onChange={handleLogoUpload}
           disabled={logoUploading}
           className="text-sm"
