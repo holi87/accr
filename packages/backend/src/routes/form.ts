@@ -162,7 +162,54 @@ export async function formRoutes(app: FastifyInstance) {
 
     return reply.status(201).send({
       id: submission.id,
+      trackingToken: submission.trackingToken,
       confirmText,
     });
+  });
+
+  // GET /api/form/track/:token — public tracking page
+  app.get('/form/track/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const submission = await app.prisma.submission.findUnique({
+      where: { trackingToken: token },
+      include: {
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!submission) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Zgłoszenie nie znalezione' });
+    }
+
+    return {
+      id: submission.id,
+      status: submission.status,
+      iterationCount: submission.iterationCount,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+      history: submission.statusHistory.map((h) => ({
+        fromStatus: h.fromStatus,
+        toStatus: h.toStatus,
+        comment: h.comment,
+        date: h.createdAt,
+      })),
+    };
+  });
+
+  // GET /api/form/pricing — public pricing info
+  app.get('/form/pricing', async () => {
+    return {
+      pricing: [
+        { service: 'Akredytacja materiału — j. polski', price: '7 000,00', unit: 'netto PLN', validity: 'na czas obowiązywania sylabusa' },
+        { service: 'Akredytacja materiału — j. angielski', price: '8 000,00', unit: 'netto PLN', validity: 'na czas obowiązywania sylabusa' },
+        { service: 'Przeniesienie materiału szkoleniowego', price: '3 250,00', unit: 'netto PLN', validity: 'jednorazowo za materiał' },
+        { service: 'Przeniesienie dostawcy szkoleń', price: '1 200,00', unit: 'netto PLN', validity: 'jednorazowo za dostawcę' },
+        { service: 'Roczne utrzymanie dostawcy na liście', price: '1 200,00', unit: 'netto PLN', validity: 'rocznie za dostawcę' },
+        { service: 'Materiał powiązany z dostawcą', price: '150,00', unit: 'netto PLN', validity: 'rocznie za materiał' },
+        { service: 'Crossakredytacja', price: '0,00', unit: 'netto PLN', validity: '10 dni roboczych' },
+      ],
+      vat: '23%',
+      note: 'Do cen należy doliczyć VAT 23%. Crossakredytacja jest bezpłatna.',
+    };
   });
 }

@@ -20,15 +20,23 @@ interface SubmissionsResponse {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  NOWE: 'Nowe',
-  W_TRAKCIE: 'W trakcie',
+  NOWE: 'Nowe zgłoszenie',
+  WERYFIKACJA_KOMPLETNOSCI: 'Weryfikacja kompletności',
+  OCZEKIWANIE_NA_PLATNOSC: 'Oczekiwanie na płatność',
+  W_RECENZJI: 'W recenzji',
+  OCZEKIWANIE_NA_POPRAWKI: 'Oczekiwanie na poprawki',
+  PONOWNA_RECENZJA: 'Ponowna recenzja',
   ZAAKCEPTOWANE: 'Zaakceptowane',
   ODRZUCONE: 'Odrzucone',
 };
 
 const STATUS_COLORS: Record<string, string> = {
   NOWE: 'bg-blue-100 text-blue-800',
-  W_TRAKCIE: 'bg-yellow-100 text-yellow-800',
+  WERYFIKACJA_KOMPLETNOSCI: 'bg-blue-100 text-blue-800',
+  OCZEKIWANIE_NA_PLATNOSC: 'bg-yellow-100 text-yellow-800',
+  W_RECENZJI: 'bg-purple-100 text-purple-800',
+  OCZEKIWANIE_NA_POPRAWKI: 'bg-orange-100 text-orange-800',
+  PONOWNA_RECENZJA: 'bg-purple-100 text-purple-800',
   ZAAKCEPTOWANE: 'bg-green-100 text-green-800',
   ODRZUCONE: 'bg-red-100 text-red-800',
 };

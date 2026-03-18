@@ -27,6 +27,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // Clean and recreate admin
+  await prisma.statusChange.deleteMany();
   await prisma.emailLog.deleteMany();
   await prisma.note.deleteMany();
   await prisma.answer.deleteMany();

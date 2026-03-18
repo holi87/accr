@@ -4,20 +4,22 @@ import { api } from '@/lib/api';
 
 interface Stats {
   total: number;
-  byStatus: {
-    NOWE: number;
-    W_TRAKCIE: number;
-    ZAAKCEPTOWANE: number;
-    ODRZUCONE: number;
-  };
+  byStatus: Record<string, number>;
   recentWeek: number;
 }
 
-const STATUS_CONFIG = [
-  { key: 'NOWE', label: 'Nowe', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { key: 'W_TRAKCIE', label: 'W trakcie', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+const MAIN_STATUS_CONFIG = [
+  { key: 'NOWE', label: 'Nowe zgłoszenie', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { key: 'OCZEKIWANIE_NA_POPRAWKI', label: 'Oczekiwanie na poprawki', color: 'bg-orange-100 text-orange-800 border-orange-200' },
   { key: 'ZAAKCEPTOWANE', label: 'Zaakceptowane', color: 'bg-green-100 text-green-800 border-green-200' },
   { key: 'ODRZUCONE', label: 'Odrzucone', color: 'bg-red-100 text-red-800 border-red-200' },
+] as const;
+
+const SECONDARY_STATUS_CONFIG = [
+  { key: 'WERYFIKACJA_KOMPLETNOSCI', label: 'Weryfikacja kompletności', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { key: 'OCZEKIWANIE_NA_PLATNOSC', label: 'Oczekiwanie na płatność', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+  { key: 'W_RECENZJI', label: 'W recenzji', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { key: 'PONOWNA_RECENZJA', label: 'Ponowna recenzja', color: 'bg-purple-50 text-purple-700 border-purple-200' },
 ] as const;
 
 export default function Dashboard() {
@@ -70,8 +72,8 @@ export default function Dashboard() {
       </div>
 
       <h2 className="text-lg font-semibold mb-4">Statusy zgłoszeń</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {STATUS_CONFIG.map(({ key, label, color }) => (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {MAIN_STATUS_CONFIG.map(({ key, label, color }) => (
           <button
             key={key}
             onClick={() => navigate(`/admin/submissions?status=${key}`)}
@@ -79,7 +81,22 @@ export default function Dashboard() {
           >
             <p className="text-sm font-medium">{label}</p>
             <p className="text-2xl font-bold mt-1">
-              {stats.byStatus[key as keyof Stats['byStatus']] ?? 0}
+              {stats.byStatus[key] ?? 0}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {SECONDARY_STATUS_CONFIG.map(({ key, label, color }) => (
+          <button
+            key={key}
+            onClick={() => navigate(`/admin/submissions?status=${key}`)}
+            className={`p-3 rounded-lg border text-left hover:shadow-sm transition-shadow ${color}`}
+          >
+            <p className="text-xs font-medium">{label}</p>
+            <p className="text-lg font-bold mt-0.5">
+              {stats.byStatus[key] ?? 0}
             </p>
           </button>
         ))}

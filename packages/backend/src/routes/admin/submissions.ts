@@ -76,6 +76,7 @@ export async function adminSubmissionRoutes(app: FastifyInstance) {
           orderBy: { createdAt: 'desc' },
         },
         emails: { orderBy: { sentAt: 'desc' } },
+        statusHistory: { orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -89,15 +90,38 @@ export async function adminSubmissionRoutes(app: FastifyInstance) {
   // PATCH /admin/submissions/:id/status
   app.patch('/submissions/:id/status', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = z.object({ status: z.enum(['NOWE', 'W_TRAKCIE', 'ZAAKCEPTOWANE', 'ODRZUCONE']) }).safeParse(request.body);
+    const body = z.object({
+      status: z.enum(['NOWE', 'WERYFIKACJA_KOMPLETNOSCI', 'OCZEKIWANIE_NA_PLATNOSC', 'W_RECENZJI', 'OCZEKIWANIE_NA_POPRAWKI', 'PONOWNA_RECENZJA', 'ZAAKCEPTOWANE', 'ODRZUCONE']),
+      comment: z.string().optional(),
+    }).safeParse(request.body);
 
     if (!body.success) {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'Nieprawidłowy status' });
     }
 
+    const current = await app.prisma.submission.findUnique({ where: { id: parseInt(id) } });
+    if (!current) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    const isIteration = body.data.status === 'OCZEKIWANIE_NA_POPRAWKI';
+
     const submission = await app.prisma.submission.update({
       where: { id: parseInt(id) },
-      data: { status: body.data.status },
+      data: {
+        status: body.data.status,
+        iterationCount: isIteration ? { increment: 1 } : undefined,
+      },
+    });
+
+    // Log status change
+    await app.prisma.statusChange.create({
+      data: {
+        submissionId: submission.id,
+        fromStatus: current.status,
+        toStatus: body.data.status,
+        comment: body.data.comment || null,
+      },
     });
 
     return submission;

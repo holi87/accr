@@ -30,21 +30,46 @@ interface ApiEmailLog {
   sentAt: string;
 }
 
+interface StatusHistoryEntry {
+  fromStatus: string | null;
+  toStatus: string;
+  comment: string | null;
+  createdAt: string;
+}
+
 interface ApiSubmission {
   id: number;
   applicationType: string[];
   entityType: string;
   status: string;
+  trackingToken?: string;
+  iterationCount?: number;
   createdAt: string;
+  updatedAt?: string;
   answers: ApiAnswer[];
   notes: ApiNote[];
   emails: ApiEmailLog[];
+  statusHistory?: StatusHistoryEntry[];
 }
 
-const STATUSES = ['NOWE', 'W_TRAKCIE', 'ZAAKCEPTOWANE', 'ODRZUCONE'] as const;
+const STATUSES = [
+  'NOWE',
+  'WERYFIKACJA_KOMPLETNOSCI',
+  'OCZEKIWANIE_NA_PLATNOSC',
+  'W_RECENZJI',
+  'OCZEKIWANIE_NA_POPRAWKI',
+  'PONOWNA_RECENZJA',
+  'ZAAKCEPTOWANE',
+  'ODRZUCONE',
+] as const;
+
 const STATUS_LABELS: Record<string, string> = {
-  NOWE: 'Nowe',
-  W_TRAKCIE: 'W trakcie',
+  NOWE: 'Nowe zgłoszenie',
+  WERYFIKACJA_KOMPLETNOSCI: 'Weryfikacja kompletności',
+  OCZEKIWANIE_NA_PLATNOSC: 'Oczekiwanie na płatność',
+  W_RECENZJI: 'W recenzji',
+  OCZEKIWANIE_NA_POPRAWKI: 'Oczekiwanie na poprawki',
+  PONOWNA_RECENZJA: 'Ponowna recenzja',
   ZAAKCEPTOWANE: 'Zaakceptowane',
   ODRZUCONE: 'Odrzucone',
 };
@@ -68,6 +93,8 @@ export default function SubmissionDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [pendingStatus, setPendingStatus] = useState('');
+  const [statusComment, setStatusComment] = useState('');
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteSubmitting, setNoteSubmitting] = useState(false);
@@ -76,6 +103,8 @@ export default function SubmissionDetail() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [emailSending, setEmailSending] = useState(false);
+
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -94,11 +123,24 @@ export default function SubmissionDetail() {
   }, [id, navigate]);
 
   const handleStatusChange = async (newStatus: string) => {
-    if (!id || statusUpdating) return;
+    setPendingStatus(newStatus);
+    setStatusComment('');
+  };
+
+  const confirmStatusChange = async () => {
+    if (!id || statusUpdating || !pendingStatus) return;
     setStatusUpdating(true);
     try {
-      await api.patch(`/admin/submissions/${id}/status`, { status: newStatus });
-      setSubmission((prev) => (prev ? { ...prev, status: newStatus } : prev));
+      await api.patch(`/admin/submissions/${id}/status`, {
+        status: pendingStatus,
+        comment: statusComment || undefined,
+      });
+      setSubmission((prev) => (prev ? { ...prev, status: pendingStatus } : prev));
+      setPendingStatus('');
+      setStatusComment('');
+      // Refresh to get updated statusHistory
+      const updated = await api.get<ApiSubmission>(`/admin/submissions/${id}`);
+      setSubmission(updated);
     } catch {
       setError('Nie udało się zmienić statusu');
     } finally {
@@ -145,6 +187,15 @@ export default function SubmissionDetail() {
     } finally {
       setEmailSending(false);
     }
+  };
+
+  const copyTrackingLink = () => {
+    if (!submission?.trackingToken) return;
+    const url = `${window.location.origin}/track/${submission.trackingToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    });
   };
 
   if (loading) {
@@ -196,12 +247,17 @@ export default function SubmissionDetail() {
               </span>
             </div>
             <p className="text-sm text-gray-600 mt-1">{applicantEmail}</p>
+            {(submission.iterationCount ?? 0) > 0 && (
+              <p className="text-sm text-orange-600 mt-1 font-medium">
+                Iteracja: {submission.iterationCount}
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
             <select
-              value={submission.status}
+              value={pendingStatus || submission.status}
               onChange={(e) => handleStatusChange(e.target.value)}
               disabled={statusUpdating}
               className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -214,7 +270,94 @@ export default function SubmissionDetail() {
             </select>
           </div>
         </div>
+
+        {/* Status change comment */}
+        {pendingStatus && pendingStatus !== submission.status && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Komentarz do zmiany statusu (opcjonalny)
+            </label>
+            <textarea
+              value={statusComment}
+              onChange={(e) => setStatusComment(e.target.value)}
+              rows={2}
+              placeholder="Dodaj komentarz widoczny w historii zmian..."
+              className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={confirmStatusChange}
+                disabled={statusUpdating}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                {statusUpdating ? 'Zapisywanie...' : 'Zmień status'}
+              </button>
+              <button
+                onClick={() => setPendingStatus('')}
+                className="px-4 py-1.5 border rounded-md text-sm hover:bg-gray-50"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tracking token */}
+        {submission.trackingToken && (
+          <div className="mt-4 flex items-center gap-2 text-sm">
+            <span className="text-gray-500">Link śledzenia:</span>
+            <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all">
+              {window.location.origin}/track/{submission.trackingToken}
+            </code>
+            <button
+              onClick={copyTrackingLink}
+              className="text-blue-600 hover:text-blue-800 text-xs flex-shrink-0"
+            >
+              {tokenCopied ? 'Skopiowano!' : 'Kopiuj'}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Status History */}
+      {submission.statusHistory && submission.statusHistory.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Historia statusów</h2>
+          <div className="relative">
+            <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-gray-200" />
+            <div className="space-y-3">
+              {submission.statusHistory.map((entry, idx) => (
+                <div key={idx} className="relative flex gap-4 pl-8">
+                  <div className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                  <div className="flex-1 pb-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      {entry.fromStatus && (
+                        <>
+                          <span className="text-gray-500">
+                            {STATUS_LABELS[entry.fromStatus] || entry.fromStatus}
+                          </span>
+                          <span className="text-gray-400">&rarr;</span>
+                        </>
+                      )}
+                      <span className="font-medium">
+                        {STATUS_LABELS[entry.toStatus] || entry.toStatus}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(entry.createdAt).toLocaleString('pl-PL')}
+                    </p>
+                    {entry.comment && (
+                      <p className="text-sm text-gray-600 mt-1 bg-gray-50 rounded p-2">
+                        {entry.comment}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Answers */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -349,7 +492,7 @@ export default function SubmissionDetail() {
               <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded text-sm">
                 <div>
                   <span className="font-medium">{log.subject}</span>
-                  <span className="text-xs text-gray-500 ml-2">→ {log.toAddress}</span>
+                  <span className="text-xs text-gray-500 ml-2">&rarr; {log.toAddress}</span>
                 </div>
                 <span className="text-xs text-gray-500">
                   {new Date(log.sentAt).toLocaleString('pl-PL')}

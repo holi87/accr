@@ -175,12 +175,14 @@ export default function FormPage() {
         questionId: parseInt(qId),
         value,
       }));
-      const res = await api.post<{ id: number; confirmText: string }>('/form/submit', {
+      const res = await api.post<{ id: number; trackingToken: string; confirmText: string }>('/form/submit', {
         applicationType: values.applicationType.map(normalizeType),
         entityType: normalizeEntity(values.entityType),
         answers: allAnswers,
       });
-      navigate(`/confirmation/${res.id}`, { state: { confirmText: res.confirmText } });
+      navigate(`/confirmation/${res.id}`, {
+        state: { confirmText: res.confirmText, trackingToken: res.trackingToken },
+      });
     } catch (err: unknown) {
       const error = err as { message?: string; details?: Record<string, string> };
       setSubmitError(error.message || 'Wystąpił błąd');

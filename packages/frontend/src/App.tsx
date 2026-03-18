@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/client/LandingPage';
 import FormPage from './pages/client/FormPage';
 import ConfirmationPage from './pages/client/ConfirmationPage';
+import TrackingPage from './pages/client/TrackingPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminSetup from './pages/admin/AdminSetup';
 import AdminLayout from './components/admin/AdminLayout';
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/form" element={<FormPage />} />
       <Route path="/confirmation/:id" element={<ConfirmationPage />} />
+      <Route path="/track/:token" element={<TrackingPage />} />
 
       {/* Admin */}
       <Route path="/admin/login" element={<AdminLogin />} />

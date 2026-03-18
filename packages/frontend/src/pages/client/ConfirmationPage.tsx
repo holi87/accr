@@ -4,7 +4,13 @@ export default function ConfirmationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const confirmText = (location.state as { confirmText?: string })?.confirmText;
+  const state = location.state as { confirmText?: string; trackingToken?: string } | null;
+  const confirmText = state?.confirmText;
+  const trackingToken = state?.trackingToken;
+
+  const trackingUrl = trackingToken
+    ? `${window.location.origin}/track/${trackingToken}`
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -24,6 +30,24 @@ export default function ConfirmationPage() {
               O dalszych krokach poinformujemy drogą mailową.
             </p>
           )}
+
+          {trackingUrl && (
+            <div className="bg-blue-50 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm font-medium text-blue-900 mb-2">
+                Śledź status zgłoszenia:
+              </p>
+              <a
+                href={trackingUrl}
+                className="text-sm text-blue-600 hover:underline break-all"
+              >
+                {trackingUrl}
+              </a>
+              <p className="text-xs text-gray-500 mt-2">
+                Zachowaj ten link — pozwala śledzić status wniosku bez logowania.
+              </p>
+            </div>
+          )}
+
           <button
             onClick={() => navigate('/')}
             className="inline-flex items-center px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"

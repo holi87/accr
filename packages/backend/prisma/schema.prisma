@@ -66,9 +66,12 @@ enum FieldType {
 
 model Submission {
   id              Int      @id @default(autoincrement())
+  trackingToken   String   @unique @default(uuid())
   applicationType Json
   entityType      String
   status          Status   @default(NOWE)
+  statusHistory   StatusChange[]
+  iterationCount  Int      @default(0)
   answers         Answer[]
   notes           Note[]
   emails          EmailLog[]
@@ -77,13 +80,30 @@ model Submission {
 
   @@index([status])
   @@index([createdAt])
+  @@index([trackingToken])
 }
 
 enum Status {
   NOWE
-  W_TRAKCIE
+  WERYFIKACJA_KOMPLETNOSCI
+  OCZEKIWANIE_NA_PLATNOSC
+  W_RECENZJI
+  OCZEKIWANIE_NA_POPRAWKI
+  PONOWNA_RECENZJA
   ZAAKCEPTOWANE
   ODRZUCONE
+}
+
+model StatusChange {
+  id           Int        @id @default(autoincrement())
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fromStatus   String
+  toStatus     String
+  comment      String?    @db.Text
+  createdAt    DateTime   @default(now())
+
+  @@index([submissionId])
 }
 
 model Answer {

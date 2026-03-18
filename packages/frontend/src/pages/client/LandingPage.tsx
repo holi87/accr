@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import PricingSection from './PricingSection';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -60,6 +61,8 @@ export default function LandingPage() {
             </li>
           </ol>
         </div>
+
+        <PricingSection />
 
         <div className="text-center">
           <button
